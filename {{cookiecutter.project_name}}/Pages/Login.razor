@@ -1,0 +1,107 @@
+@page "/login"
+@layout LoginLayout
+@using System.ComponentModel.DataAnnotations
+@using {{cookiecutter.project_name}}.Services
+@inject IAccountService AccountService;
+@inject NavigationManager NavigationManager
+
+
+<PageTitle>Login</PageTitle>
+<EditForm Model="@model" OnValidSubmit="InvokeLogin">
+    <DataAnnotationsValidator />
+    <MudPaper Width="100%" MinHeight="300px" Square="true" Class="pa-9 d-flex flex-column gap-y-4">
+        <MudText Typo="Typo.h3">Login</MudText>
+        <MudText Typo="Typo.subtitle1">Sign in to your account</MudText>
+
+
+        <MudTextField @bind-Value="model.Email" Label="Email" Error="@loginError" For="@(() => model.Email)"
+            Variant="Variant.Outlined">
+        </MudTextField>
+
+        <MudTextField @bind-Value="model.Password" Label="Password" Error="@loginError" ErrorText="@loginErrorMessage"
+            For="@(() => model.Password)" Variant="Variant.Outlined" InputType="@PasswordInput"
+            Adornment="Adornment.End" AdornmentIcon="@PasswordInputIcon" OnAdornmentClick="ToggleShowPassword"
+            AdornmentAriaLabel="Show Password" />
+
+        <MudButton ButtonType="ButtonType.Submit" Variant="Variant.Filled" Color="Color.Primary" Size="Size.Large"
+            Class="mt-2">
+            Login
+        </MudButton>
+    </MudPaper>
+</EditForm>
+
+@code {
+    bool isShow = false;
+    InputType PasswordInput = InputType.Password;
+    string PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+
+    LoginForm model = new LoginForm();
+    bool loginError = false;
+    string loginErrorMessage = "Incorrect email or password. Try again.";
+
+    [CascadingParameter]
+    public Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthenticationStateTask == null) return;
+        var authstate = await AuthenticationStateTask;
+
+        if (authstate != null)
+        {
+            var user = authstate.User;
+
+            if (user.Identity == null) return;
+
+            if (user.Identity.IsAuthenticated)
+            {
+                NavigationManager.NavigateTo("/");
+            }
+        }
+    }
+
+    void ToggleShowPassword()
+    {
+        @if (isShow)
+        {
+            isShow = false;
+            PasswordInputIcon = Icons.Material.Filled.VisibilityOff;
+            PasswordInput = InputType.Password;
+        }
+        else
+        {
+            isShow = true;
+            PasswordInputIcon = Icons.Material.Filled.Visibility;
+            PasswordInput = InputType.Text;
+        }
+    }
+
+    public async Task InvokeLogin(EditContext context)
+    {
+        var loginModel = (LoginForm)context.Model;
+        if (!string.IsNullOrEmpty(loginModel.Email) && !string.IsNullOrEmpty(loginModel.Password))
+        {
+            var isLoginSuccesful = await AccountService.LoginAsync(loginModel.Email, loginModel.Password);
+            if (isLoginSuccesful)
+            {
+                NavigationManager.NavigateTo("/");
+            }
+            else
+            {
+                loginError = true;
+                StateHasChanged();
+            }
+        }
+    }
+
+    public class LoginForm
+    {
+        [Required]
+        [EmailAddress]
+        public string? Email { get; set; }
+
+        [Required]
+        [StringLength(30, ErrorMessage = "Password must be at least 8 characters long.", MinimumLength = 8)]
+        public string? Password { get; set; }
+    }
+}

@@ -1,0 +1,13 @@
+{
+    "project_name": "project",
+    "Region": "",
+    "UserPoolClientId": "",
+    "UserPoolClientSecret": "",
+    "UserPoolId": "",
+    "IdentityPoolId":"",
+    "JwtKey":"",
+    "JwtExponent":"",
+    "full_name": "",
+    "email": "",
+    "version": "0.1.0"
+}

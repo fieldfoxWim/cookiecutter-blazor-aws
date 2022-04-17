@@ -1,0 +1,122 @@
+﻿@using System.Security.Claims
+@inherits LayoutComponentBase
+@inject ISnackbar Snackbar
+@inject IAccountService _accountService;
+@inject NavigationManager _navigationManager
+
+<PageTitle>{{cookiecutter.project_name}}</PageTitle>
+
+<MudThemeProvider Theme="MyCustomTheme" />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+<MudLayout>
+    <MudAppBar Elevation="0">
+        <MudIconButton Icon="@Icons.Material.Filled.Menu" Color="Color.Inherit" Edge="Edge.Start"
+            OnClick="@((e) => DrawerToggle())" />
+        @* <MudText Typo="Typo.h5" Class="ml-3"></MudText> *@
+        <MudSpacer />
+
+
+        <MudIconButton Icon="@Icons.Outlined.Notifications" Color="Color.Inherit" Edge="Edge.End"
+            OnClick="@((e) => ShowToast())" />
+        <MudMenu>
+            <ActivatorContent>
+                <MudAvatar Color="Color.Primary" Class="ml-3">@email.Substring(0,1)</MudAvatar>
+            </ActivatorContent>
+            <ChildContent>
+                <MudItem Class="ml-4 mr-4">@email</MudItem>
+                <MudMenuItem OnClick="Logout">Logout</MudMenuItem>
+            </ChildContent>
+        </MudMenu>
+    </MudAppBar>
+    <MudDrawer @bind-Open="_drawerOpen" ClipMode="@DrawerClipMode.Never" Elevation="3">
+        <MudImage Src="images/clients-logo.png" ObjectFit="ObjectFit.Cover" ObjectPosition="ObjectPosition.Center"
+            Width="240" Height="50" Alt="SLogo" Class="mt-4" />
+        <NavMenu />
+    </MudDrawer>
+    <MudMainContent>
+        <MudContainer>
+            @Body
+        </MudContainer>
+
+    </MudMainContent>
+</MudLayout>
+
+@code {
+
+
+    [CascadingParameter]
+    public Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+    bool _drawerOpen = true;
+
+    string userName = "...";
+    string email = "...";
+
+    string value = "test";
+    void DrawerToggle()
+    {
+        _drawerOpen = !_drawerOpen;
+    }
+
+    void ShowToast()
+    {
+        Snackbar.Add(value);
+    }
+
+    public async Task Logout()
+    {
+        await _accountService.LogoutAsync(userName);
+        _navigationManager.NavigateTo("/login");
+
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthenticationStateTask == null) return;
+        var authstate = await AuthenticationStateTask;
+
+        if (authstate == null) return;
+
+        var user = authstate.User;
+
+        if (user.Identity == null) return;
+
+        if (user.Identity.IsAuthenticated)
+        {
+            userName = user.Identity.Name;
+            if (user.Claims != null)
+                email = user.Claims.Where(c => c.Type == ClaimTypes.Email).Select(c => c.Value).SingleOrDefault();
+        }
+    }
+
+    MudTheme MyCustomTheme = new MudTheme()
+    {
+        Palette = new Palette()
+        {
+            TextPrimary = new MudBlazor.Utilities.MudColor(37, 42, 54, 255),
+            AppbarBackground = new MudBlazor.Utilities.MudColor(49, 156, 138, 0),
+            AppbarText = new MudBlazor.Utilities.MudColor(37, 42, 54, 255),
+            Primary = new MudBlazor.Utilities.MudColor(49, 156, 138, 255),
+            Background = new MudBlazor.Utilities.MudColor(248, 249, 250, 255),
+            //DrawerBackground = MudBlazor.Colors.Grey.Default;
+            // new MudBlazor.Utilities.MudColor(248, 249, 250, 255),
+            //DrawerIcon = new MudBlazor.Utilities.MudColor(49, 156, 138, 255),
+            ActionDefault = new MudBlazor.Utilities.MudColor(255, 255, 255, 255),
+
+
+            @* Secondary = Colors.Green.Accent4,
+                AppbarBackground = Colors.Red.Default, *@
+        },
+        @* PaletteDark = new Palette()
+            {
+            Primary = Colors.Blue.Lighten1
+            },
+
+            LayoutProperties = new LayoutProperties()
+            {
+            DrawerWidthLeft = "260px",
+            DrawerWidthRight = "300px"
+            } *@
+    };
+}

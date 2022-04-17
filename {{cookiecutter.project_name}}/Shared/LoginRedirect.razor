@@ -1,0 +1,12 @@
+@attribute [AllowAnonymous]
+@inject NavigationManager _navigationManager
+
+
+<h3>Time to login (Component)</h3>
+
+@code {
+    protected override void OnInitialized()
+    {
+        _navigationManager.NavigateTo("/login");
+    }
+}

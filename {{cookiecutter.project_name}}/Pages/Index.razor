@@ -1,0 +1,58 @@
+﻿@page "/"
+@attribute [Authorize]
+
+<PageTitle>Index</PageTitle>
+
+<MudText Typo="Typo.h4" Class="mb-4">Dashboard</MudText>
+
+<MudPaper Class="" Height="600px" Outlined="true">
+    <MudToolBar>
+        <MudText Typo="Typo.h6" Class="">Editor</MudText>
+        <MudSpacer />
+        <MudIconButton Icon="@Icons.Material.Outlined.Notifications" Color="Color.Inherit" />
+        <MudIconButton Icon="@Icons.Material.Outlined.PushPin" Color="Color.Inherit" />
+        <MudIconButton Icon="@Icons.Material.Outlined.PeopleAlt" Color="Color.Inherit" />
+        <MudIconButton Icon="@Icons.Material.Outlined.MoreVert" Color="Color.Inherit" />
+    </MudToolBar>
+
+    <MonacoEditor Id="editor" ConstructionOptions="GetEditorConstructionOptions" CssClass="editor-class" />
+</MudPaper>
+
+<style>
+    .editor-class {
+        height: 80%;
+        padding: 0px 16px 0px 16px;
+    }
+</style>
+
+@code {
+    [CascadingParameter]
+    public Task<AuthenticationState>? AuthenticationStateTask { get; set; }
+
+    private StandaloneEditorConstructionOptions GetEditorConstructionOptions(MonacoEditor editor)
+    {
+        return new StandaloneEditorConstructionOptions
+        {
+            AutomaticLayout = true,
+            Language = "json",
+            Value = "{\"key\":\"value\"\n" +
+        "}"
+        };
+    }
+    protected override async Task OnInitializedAsync()
+    {
+        if (AuthenticationStateTask == null) return;
+        var authstate = await AuthenticationStateTask;
+
+        if (authstate == null) return;
+
+        var user = authstate.User;
+
+        if (user.Identity == null) return;
+
+        if (user.Identity.IsAuthenticated)
+        {
+
+        }
+    }
+}

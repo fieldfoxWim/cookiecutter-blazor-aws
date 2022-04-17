@@ -1,0 +1,15 @@
+﻿@using {{cookiecutter.project_name}}.Pages
+<CascadingAuthenticationState>
+    <Router AppAssembly="@typeof(App).Assembly">
+        <Found Context="routeData">
+            <AuthorizeRouteView RouteData="@routeData" DefaultLayout="@typeof(MainLayout)">
+                <NotAuthorized>
+                    <LoginRedirect></LoginRedirect>
+                </NotAuthorized>
+            </AuthorizeRouteView>
+        </Found>
+        <NotFound>
+            <LoginRedirect></LoginRedirect>
+        </NotFound>
+    </Router>
+</CascadingAuthenticationState>
