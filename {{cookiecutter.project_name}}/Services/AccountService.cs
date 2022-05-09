@@ -1,10 +1,12 @@
 using Amazon;
 using Amazon.CognitoIdentity;
 using Amazon.CognitoIdentityProvider;
+using Amazon.CognitoIdentityProvider.Model;
 using Amazon.Extensions.CognitoAuthentication;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Components.Server.ProtectedBrowserStorage;
 using {{cookiecutter.project_name}}.Auth;
+using {{cookiecutter.project_name}}.Shared.Models;
 
 namespace {{cookiecutter.project_name}}.Services
 {
@@ -34,14 +36,15 @@ namespace {{cookiecutter.project_name}}.Services
             return credentials;
         }
 
-        public async Task<bool> LoginAsync(string userId, string password)
+         public async Task<LoginState> LoginAsync(string userId, string password, string? newPassword = null, string? confirmationCode = null)
         {
+            var provider = new AmazonCognitoIdentityProviderClient(new Amazon.Runtime.AnonymousAWSCredentials(), RegionEndpoint.GetBySystemName(Configuration["AWS:Region"]));
+
+            var userPool = new CognitoUserPool(Configuration["AWS:UserPoolId"], Configuration["AWS:UserPoolClientId"], provider, Configuration["AWS:UserPoolClientSecret"]);
+            var user = new CognitoUser(userId, Configuration["AWS:UserPoolClientId"], userPool, provider, Configuration["AWS:UserPoolClientSecret"]);
+                
             try
             {
-                AmazonCognitoIdentityProviderClient provider = new AmazonCognitoIdentityProviderClient(new Amazon.Runtime.AnonymousAWSCredentials(), RegionEndpoint.GetBySystemName(Configuration["AWS:Region"]));
-
-                CognitoUserPool userPool = new CognitoUserPool(Configuration["AWS:UserPoolId"], Configuration["AWS:UserPoolClientId"], provider, Configuration["AWS:UserPoolClientSecret"]);
-                var user = new CognitoUser(userId, Configuration["AWS:UserPoolClientId"], userPool, provider, Configuration["AWS:UserPoolClientSecret"]);
                 InitiateSrpAuthRequest authRequest = new InitiateSrpAuthRequest()
                 {
                     Password = password
@@ -51,34 +54,71 @@ namespace {{cookiecutter.project_name}}.Services
 
                 if (authResponse.AuthenticationResult == null)
                 {
-                    return false;
+                    Console.WriteLine(authResponse.ChallengeName);
+                    if (authResponse.ChallengeName == ChallengeNameType.NEW_PASSWORD_REQUIRED)
+                    {
+                        if (string.IsNullOrEmpty(newPassword)) return LoginState.NEW_PASSWORD_REQUIRED;
+                        
+                        authResponse = await user.RespondToNewPasswordRequiredAsync(new RespondToNewPasswordRequiredRequest()
+                        {
+                            SessionID = authResponse.SessionID,
+                            NewPassword = newPassword
+                        }).ConfigureAwait(false);
+                    }
+                    else if (authResponse.ChallengeName == ChallengeNameType.SMS_MFA)
+                    {
+                        Console.WriteLine("Enter the MFA Code sent to your device:");
+                    }
+                    else
+                    {
+                        return LoginState.FAILED;
+                        Console.WriteLine("Unrecognized authentication challenge.");
+                    }
+                    
                 }
 
                 var userDetails = await user.GetUserDetailsAsync();
                 //userDetails.UserAttributes.ToList().ForEach(i => Console.WriteLine("{0}:{1}", i.Name, i.Value));
                 await ProtectedLocalStorage.SetAsync("user", userDetails.UserAttributes.Where(u => u.Name == "email").Select(u => u.Value).SingleOrDefault());
 
-                var token = authResponse.AuthenticationResult.AccessToken;
-                var idToken = authResponse.AuthenticationResult.IdToken;
-
-                await ProtectedLocalStorage.SetAsync("token", token);
-                await ProtectedLocalStorage.SetAsync("id_token", idToken);
-
-                ((CognitoStateProvider)AuthenticationStateProvider).Notify();
-
-                validationTimer = new Timer(
-                    ((CognitoStateProvider)AuthenticationStateProvider).Verify,
-                    null,
-                    TimeSpan.Zero,
-                    TimeSpan.FromSeconds(300)
-                );
-
-                return true;
+                return await FinishLogin(authResponse);
+                
             }
-            catch (System.Exception)
+            catch(PasswordResetRequiredException e)
             {
-                return false;
+                if(string.IsNullOrEmpty(confirmationCode)) return LoginState.PASSWORD_RESET_REQUIRED;
+
+                await user.ConfirmForgotPasswordAsync(confirmationCode, newPassword);
+
+                return await this.LoginAsync(userId, newPassword);
             }
+            catch (System.Exception e)
+            {
+                Console.WriteLine("Could not login {0}", e);
+                return LoginState.FAILED;
+            }
+        }
+
+        private async Task<LoginState> FinishLogin(AuthFlowResponse authResponse) 
+        {
+            var token = authResponse.AuthenticationResult.AccessToken;
+            var idToken = authResponse.AuthenticationResult.IdToken;
+
+            System.Console.WriteLine("Token expires in {0}", authResponse.AuthenticationResult.ExpiresIn);
+
+            await ProtectedLocalStorage.SetAsync("token", token);
+            await ProtectedLocalStorage.SetAsync("id_token", idToken);
+
+            ((CognitoStateProvider)AuthenticationStateProvider).Notify();
+
+            validationTimer = new Timer(
+                ((CognitoStateProvider)AuthenticationStateProvider).Verify,
+                null,
+                TimeSpan.Zero,
+                TimeSpan.FromSeconds(300)
+            );
+
+            return LoginState.SUCCESFUL;
         }
 
         public async Task<bool> LogoutAsync(string userId)
